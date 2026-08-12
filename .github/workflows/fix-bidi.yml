@@ -1,0 +1,47 @@
+name: Fix bilingual text direction
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply professional RTL/LTR handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          marker = '</style>'
+          css = '''
+          /* Professional bilingual RTL/LTR typography */
+          :where(h1,h2,h3,h4,h5,h6,p,li,td,th,button,a){unicode-bidi:plaintext;}
+          :where(.english,.english-title,.enhead,.word,.eyebrow,.subtitle,.code,.code-label,.workflow-output,.navlinks,.footer a){direction:ltr;unicode-bidi:isolate;text-align:left;}
+          :where(.ar,.muted){unicode-bidi:plaintext;}
+          [lang="en"], .en, .ltr{direction:ltr!important;unicode-bidi:isolate;text-align:left!important;}
+          '''
+          if '/* Professional bilingual RTL/LTR typography */' not in s:
+              s = s.replace(marker, css + marker, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "Polish English sentence direction in bilingual UI"
+          git push
+      - name: Remove one-time workflow
+        if: always()
+        run: |
+          git rm -f .github/workflows/fix-bidi.yml || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Remove one-time bidi workflow" || true
+          git push || true
